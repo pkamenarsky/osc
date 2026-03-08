@@ -1,0 +1,30 @@
+* sum types
+* only type aliasing
+type = accountant {
+  salary: int32
+} | manager {
+  salary: int32,
+  employees: array[20]
+};
+switch(employee, age) {
+  (accountant { salary }, age) {
+    return salary > age * 100000;
+  }
+  (accountant _, _) {
+    return false;
+  }
+  _ {
+    return false;
+  }
+}
+* variables and function params/outputs can have ranges
+** check statically if something falls into range, produce error "use clamp to clamp variable into range" otherwise
+* proper versioning
+** must define functions to transform local state
+* language is SHA-addressed?
+** would need a central repository to make this useful
+* generics?
+* function overloads?
+* if is an expression?
+* switch is an expression?
+** if consecutive integers, generate a jump
