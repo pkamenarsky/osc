@@ -1,3 +1,5 @@
+* order independent function/const definitions
+* named arguments
 * sum types
 * only type aliasing
 type = accountant {
@@ -24,7 +26,146 @@ switch(employee, age) {
 * language is SHA-addressed?
 ** would need a central repository to make this useful
 * generics?
+* lambdas?
 * function overloads?
 * if is an expression?
+* dead code elimination
+* compile time statements
+* LSP
 * switch is an expression?
 ** if consecutive integers, generate a jump
+
+import base.maths as ma
+import base.oscillators.gen (osc)
+
+@author: "Philip"
+@version: 1
+@docs: "
+kjsdaslkdjasd
+"
+state
+  x: float32 = 0 @docs: 123
+  y: float32 = 0
+
+state
+  x: float32 = prev.x
+  y: float32 = prev.y
+  z: float32[256] = 0
+
+param_x: float32 = param(type: float, control: knob, min: 0, max: 100, step: 1, default: 0)
+param_y: float32 = param(type: float, control: knob, min: 0, max: 100, step: 1, default: 0)
+
+@param: { type: knob, min: 0, max: 100, step: 1, x: 1, y: 2 }
+param_z: float32 = 0
+
+@export
+param_z: float32 = 0
+
+fm(freq: float32|_ > 0 && _ < 1|, fm?: boolean): float32
+  a: float32 = osc(freq: 440)
+  b: float32 = osc(freq: a)
+
+  if fm ?? true
+    return a * b
+  else
+    return b * ma.PI
+
+type out(voices: word8) = { dry: stream[voices], wet: stream[voices], mix: stream[voices] }
+
+osc_gen(const t: type_number, freq: t): t
+
+gen(const t: tnumber, const static: bool, a: t|_ > 0 && _ < 1|): t
+  b: t = osc_gen(t, freq: 440) + a
+
+  if static
+    return 0
+  else
+    return b
+
+main(vc: float32[8], mix_amount: float32, const voices: word8): out { version = 0 }
+  out: out(voices)
+
+  for(i: int32 = 0; i < 8; i++)   // i has range |_ > 0 && _ < 8|
+    out.dry[i] = vc[i]            // no need to clamp/wrap i here because of range
+    out.wet[i] = fm(freq: vc[0])
+    out.mix[i] = mix(amount: mix_amount, a: dry[i], b: wet[i])
+
+  return out
+
+@export
+@version: 1
+@inlet: vc
+@inlet: mix_amount
+@outlet: out.wet
+@outlet: out.mix
+@outlet: out.dry
+
+main(vc: stream[8], mix_amount: float32, const voices: word8): out
+  out: out(voices)
+
+  for(i: int32 = 0; i < 8; i++)   // i has range |_ > 0 && _ < 8|
+    out.dry[i] = vc[i]            // no need to clamp/wrap i here because of range
+    out.wet[i] = fm(freq: vc[0])
+    out.mix[i] = mix(amount: mix_amount, a: dry[i], b: wet[i])
+
+  return out
+
+@author: "Philip"
+@version: 1
+@docs: "
+kjsdaslkdjasd
+"
+module fm_mod(const samples_per_frame: number):
+  x: float32 = 0 @docs: 123
+  y: float32 = 0
+
+  upgrade:
+    x: float32 = prev.x
+    y: float32 = prev.y
+    z: float32[256] = 0
+
+  @param: { type: knob, min: 0, max: 100, step: 1, x: 1, y: 2 }
+  param_z: float32 = 0
+
+  @export
+  param_z: float32 = 0
+
+  osc_a: osc_mod = new osc_mod(samples_per_frame)
+  osc_b: osc_mod = new osc_mod(samples_per_frame)
+
+  fm(freq: float32|_ > 0 && _ < 1|, fm?: boolean): float32
+    a: float32 = osc_a.run(freq: 440)
+    b: float32 = osc_b.run(freq: a)
+  
+    if fm ?? true
+      return a * b
+    else
+      return b * ma.PI
+
+  type out(voices: word8) = { dry: stream[voices], wet: stream[voices], mix: stream[voices] }
+
+  gen(const t: tnumber, const static: bool, a: t|_ > 0 && _ < 1|): t
+    b: t = osc_gen(t, freq: 440) + a
+  
+    if static
+      return 0
+    else
+      return b
+
+  @export
+  @version: 1
+  @inlet: vc
+  @inlet: mix_amount
+  @outlet: out.wet
+  @outlet: out.mix
+  @outlet: out.dry
+  
+  run(vc: stream[8], mix_amount: float32, const voices: word8): out
+    out: out(voices)
+  
+    for(i: int32 = 0; i < 8; i++)   // i has range |_ > 0 && _ < 8|
+      out.dry[i] = vc[i]            // no need to clamp/wrap i here because of range
+      out.wet[i] = fm(freq: vc[0])
+      out.mix[i] = mix(amount: mix_amount, a: dry[i], b: wet[i])
+  
+    return out
