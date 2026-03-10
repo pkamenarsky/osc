@@ -521,7 +521,7 @@ return \_ ->
   phase_o1 = 0
   phase_o2 = 0
   
-  for i: i32 = 0; i < $voices; i++
+  for i: i32|_ >= 0 < 2| = 0; i < $voices; i++ // should fail: range can't be attached to loop counter
     phase_o1++
     r: f32 = sin32 phase_o1 
     a[i] = r * i
@@ -536,6 +536,10 @@ return \_ ->
 
 * stages
 ** typechecking/inference
+** LATER semantic checks
+*** attach range to values
+*** when assigning a value to a binding (or calling a function), check range compatibility statically
+*** when accessing arrays, check range statically
 ** optimize
 *** just aggresively inline functions
 ** compute mem layout
