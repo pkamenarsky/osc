@@ -535,6 +535,7 @@ return \_ ->
     return[i] = a[i] * b[i]
 
 * stages
+** inline all const type values (necessary for delay lines etc) + $voices
 ** typechecking/inference
 ** LATER semantic checks
 *** attach range to values
