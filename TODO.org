@@ -169,3 +169,381 @@ module fm_mod(const samples_per_frame: number):
       out.mix[i] = mix(amount: mix_amount, a: dry[i], b: wet[i])
   
     return out
+    
+---
+
+-- TODO: soundfiles
+-- TODO: no shadowing
+-- TODO: commas in objects allowed only if more items on the same line (for defining stuff on the same line)
+-- TODO: everything must be used
+-- TODO: comptime has access to all cnst types in scope
+-- TODO: 'smth is of type binding
+-- TODO: ~ to unwildcard arguments
+
+-- TODO: no recursion
+-- TODO: only the innermost result of a toplevel function goes into the shared memory
+
+import osc from module:ba.osc
+
+type setter = { value: f32 } -> void
+type getter = {} -> f32
+type param = { set: setter, get: getter, min: f32, max: f32 }
+
+type in = { a: f32 }
+type out = {
+  compute: in -> { wet: stream[8], dry: stream[8] }
+  freq: param
+  q: param
+}
+
+osc: f32 -> { aaa: stream[8], zzz: stream[8] } -> out = \a ->
+  table: f32[128] = [0...];
+  
+  p: f32 = 5
+  
+  q: f32 = 0
+  
+  o: osc = osc { a: 43 }
+  oo: osc = osc { a: 55 }
+
+  while a == true
+    a = false
+
+  for i: int32 = 0; i < 100; i++
+    table[i] = i
+
+  switch i
+    0 ->
+      p = 0
+    1 ->
+      q = 0
+    _ ->
+      p = 1
+      q = 1
+
+  compute: { aaa: stream[8], zzz: stream[8] } -> out = \{..} ->
+    r: stream = o { freq: p, aaa }
+    s: stream = oo { freq: q, aaa }
+
+  return {
+    compute
+
+    freq: {
+      set: \{..} -> p = value
+      get: \_ -> p
+      min: 0
+      max: 255
+      step: 1
+    }
+
+    q: param = @param 'p { min: 0, max: 255, step: 1 } // macro
+  }
+
+  // or return fn
+  //   ...
+  // this works because every binding must have a type
+  // so when returning something the type can be inferred from the returning type of the parent function
+
+# General
+
+The language is white space sensitive. Nested blocks are intended by two spaces. No semicolons at the end of lines.
+
+# Comments
+
+Comments are C++ style: // and /* */
+
+# Bindings
+
+Bindings must always have a type and be initialized with a value:
+
+```
+a: type = value
+```
+
+# Primitive types: i32, i64, f32, f64, bool
+
+```
+a: i32 = 0
+b: f32 = 0.0
+c: bool = true // or false
+```
+
+# Assignment
+
+```
+a = 1
+b = 2.0
+a++
+b *= 10.0
+```
+
+++, *=, /=, -=, += are also supported.
+
+# Unary negation
+
+```
+a = -5
+```
+
+# Boolean negation
+
+```
+a: bool = !false
+```
+
+# Binary operations/relations
+
++, -, /, *, ^, %, <, <=, >, >=, !=, ==
+
+# Arrays: i32[8], f64[128]
+
+Arrays must always have a size.
+
+```
+c: i32[8] = [0...] // initialize with 0s
+d: i32[128] = [1.0...] // initialize with 1.0s
+```
+
+# Structures
+
+```
+f: { x: f32, y: i64[8] } = { x: 0.0, y: [0...] }
+g: {
+  x: f32 // if multiline commas can be ommited
+  y: i64[8]
+} = {
+  x: 0.0
+  y: [0...]
+}
+```
+
+# Functions
+
+```
+f: f32 -> f32 = \a -> a + 1 // types and lambdas are Haskell style
+g: { a: f32, b: i32 } -> { x: f32[8] } = \o -> { x: [0.0....] } // functions accept all types
+g: { a: f32, b: i32 } -> { x: f32[8] } = \{..} -> ... // a structure argument can be spliced into the environment, e.g. now both `a` and `b` are in scope
+g: { a: f32, b: i32 } -> { x: f32[8] } = \{..} ->
+  // functions can be multiline
+  j: f32 = 0
+  p: in32 = 0
+
+  return j + p // function might end with return statement
+
+h: f32 -> f32 -> f32 = ...
+
+x: f32 = h 0.0 1.0 // functions are called Haskell style, with spaces inbetween
+y: { x: f32[8] } = g { a: 0.0, b: 0 }
+z: f32 -> f32 = h 5.0 // functions are curried by default
+```
+
+# Type aliases
+
+```
+type in = f32[128]
+type out = { x: f32[8], y: f32[8] }
+type compute = in -> out
+```
+
+# Parenthesis
+
+Can be placed around any expression, but not statements.
+
+```
+a: i32 = (1 + 2)
+b: bool = (1 + 2) > 3
+f: f32 -> f32 = (\a -> a)
+```
+
+# While loops
+
+```
+while a == true
+  a = false
+  i++
+```
+
+# For loops
+
+```
+for i: i32 = 0; i < 100; i++
+  table[i] = i
+```
+
+# Switch statements
+
+```
+  switch i
+    0 ->
+      p = 0
+    1 ->
+      q = 0
+    _ ->
+      p = 1
+      q = 1
+```
+
+# Splice return value
+
+```
+{..}: { x: f32 } = compute_f {} // x is now in scope
+```
+---
+
+* TODO splice bindings
+* TODO no shadowing at all
+* TODO three memory zones
+** function local
+** module local (in linear memory)
+** module global (in shared memory)
+** algo
+*** if local binding not captured by closure -> local
+*** if local binding captured by closure -> linear mem
+*** if innermost return value of toplevel function -> shared mem
+*** for every local/shaderd mem binding pin storage in mem and store in environment
+*** for every complex return value call site pin storage in mem and store pointer in environment
+**** if literal value/stuct/array, just write the value into the pinned location
+**** if calling function, inherit the environment
+**** if binding, set the binding as pinned
+*** disallow currying in loops
+
+* WASM component model
+* LLM first languages
+** moonbit?
+
+---
+
+type stream = sink -> {}
+
+phasor: {} -> stream = \{} ->
+  phase: f32 = 0
+
+  return \sink ->
+    phase++
+    sink <- phase
+
+osc: {} -> stream = \{} ->
+  p: stream = phasor {}
+
+  return \sink ->
+    sink <- sinf |p|
+
+---
+
+type stream = {} -> f32
+type ~ = stream
+
+phasor: {} -> stream = \_ ->
+  phase: f32 = 0
+
+  return \_ ->
+    phase++
+    return phase
+
+osc: {} -> stream = \_ ->
+  p: stream = phasor {}
+
+  return \_ -> sinf (p {})
+
+---
+
+osc: {} -> stream = \_ ->
+  phase: f32 = 0
+
+  p: stream = \_ ->
+    phase++
+    return phase
+
+  return \_ -> sinf (p {})
+
+osc: {} -> stream = \_ ->
+  phase: f32 = 0
+
+  p: stream = \_ ->
+    phase++
+    return phase
+
+  return \_ ->
+    e = p {}
+    sinf e
+
+osc: {} -> stream = \_ ->
+  phase: f32 = 0
+
+  return \_ ->
+    phase++
+    e = phase
+    sinf e
+
+---
+
+phasor: () -> stream = \_ ->
+  phase: f32 = 0
+
+  return \_ ->
+    phase++
+    return phase
+
+osc: () -> stream = \_ ->
+  p: stream = phasor()
+
+  return \_ -> sinf p() // alternatively (p ())
+
+* stream is special cased in the compiler
+** stream 2 ~ () -> f32[2]
+** stream 3 ~ () -> f32[3]
+* $voices is both a type (resolving to an int) and a value resolving to an int
+
+type stream = {} -> f32[$voices]
+type osc = { wave: f32 -> f32 } -> stream
+
+hos: osc -> osc -> stream = osc1 osc2 ->
+  o1: stream = osc1 { wave: sin32 }
+  o2: stream = osc2 { wave: sin32 }
+
+  return \_ ->
+    a: f32[$voices] = array $voices \i -> o1() * i
+    b: f32[$voices] = array $voices \i -> o2() * i
+
+    return (array $voices \i -> a[i] + b[i])
+
+main: stream = hos lkup_osc lkup_osc
+
+* subsequent array calls can be nested into each other
+* if a binding in array N \i -> is of the form a[i] and a is bound to array N \i -> expr then replace a[i] with expr
+
+---
+
+return \_ ->
+  a: f32[$voices]
+  b: f32[$voices]
+  
+  phase_o1 = 0
+  phase_o2 = 0
+  
+  for i: i32 = 0; i < $voices; i++
+    phase_o1++
+    r: f32 = sin32 phase_o1 
+    a[i] = r * i
+  
+  for i: i32 = 0; i < $voices; i++
+    phase_o2++
+    r: f32 = sin32 phase_o1 
+    b[i] = r * i
+  
+  for i: i32 = 0; i < $voices; i++
+    return[i] = a[i] * b[i]
+
+* stages
+** typechecking/inference
+** optimize
+*** just aggresively inline functions
+** compute mem layout
+*** go down call tree and tag every complex biding with a region in linear memory
+*** on every call site, reserve region in memory for return value and pass it as the first argument to the function
+**** also pass a pointer to the frame start
+**** next frame start = frame start + previous frame size
+**** e.g. each function needs to compute its layout once
+*** if returning a complex literal, write in to the return region directly
+*** if returning a binding, tag the binding's location with the return region instead
+** codegen
