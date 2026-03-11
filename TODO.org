@@ -581,13 +581,14 @@ module Bla
   @param(min: 0, max: 10, step: 0.01)
   vol: f32
 
-  @outlet sin: stream/poly/2
+  @outlet sin: stream/mono/2 = graph
+    sin <- osc(fm: fm_amt).sin
+    out[0] <- |n| 1.0 / v * sum(|v| sin[v][n] * 2)
+
   @outlet tri: stream/poly/2
 
   a: f32[$voices]
   b: f32[$voices]
-
-  osc: OSC // basically a frame pointer
 
   new(x: f32, y: f32)
     a = x
@@ -599,13 +600,49 @@ module Bla
   get_delay(): f32
     return 5
 
-  compute()
-    a: f32 = 0
+---
 
-    r = osc(fm: fm_amt) // when calling a module provide all inlets; calls compute on osc, or error if no compute method
+* back to FP
+* functions only return simple values, structures or tuples of simple values/streams
+** structures are done by allocating enough space on the parent stack or smth
+* stream operators
 
-    // statically checked
-    sin[0] = r.sin[$nvoices - 1][0] * 2
-    sin[1] = r.sin[$nvoices - 1][0] * 2
+# lift: (a -> b) -> tuple n (a -> b)
+# =>: tuple n (a -> b) -> tuple n a -> tuple n b
 
-    tri = r.vol * 4
+type sample v n = {
+  value: i32 -> i32 -> f32
+};
+
+sample: (i32 -> i32 -> f32) -> sample v n
+
+a: sample 4 2 = sample (lambda v n -> sin v * n)
+s: sample 4 2 = sample (lambda v n -> a.value v n * b.value v n)
+
+mapsa: (f32 -> f32) -> sample v n -> sample v n = lambda f s -> sample (lambda v n -> f (s.value v n))
+
+mapst: (sample v n -> sample v n) -> stream v n -> stream v n
+apst: (sample v n -> sample v n -> sample v n) -> stream v n -> stream v n -> stream v n
+
+adjust: stream v n -> stream v m
+
+# ap: (tuple n -> tuple n -> tuple n) -> stream n -> stream n -> stream n
+# rec: i32 -> (stream n -> stream n) -> stream n
+
+# |+|: stream f32 f32
+# |,|: stream a b -> stream a c -> stream a (b, c)
+# => : stream a b -> stream b c -> stream a c
+# 
+# |5.0|: stream () f32
+
+arr: (a -> b) -> signal n a b
+
+a: signal 2 a b -> signal 2 b c -> signal 2 a c = lambda s1 s2 -> proc a ->
+  b <- s1 -< a
+  c <- s2 -< b
+  return c
+
+sin: signal f32 f32 = proc a -> return (sin a)
+
+map: (f32 -> f32) -> stream -> stream
+ap: (f32 -> f32 -> f32) -> stream -> stream -> stream
