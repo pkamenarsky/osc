@@ -594,7 +594,7 @@ module Bla
     b = y
     osc = new OSC(phase: 2)
 
-    a = |$nvoices, i| a[i] * b[i]
+    arr: f32[8] = |i| a[i] * b[i] // i range is inferred
 
   get_delay(): f32
     return 5
@@ -602,7 +602,7 @@ module Bla
   compute()
     a: f32 = 0
 
-    r = osc(fm: fm_amt) // when calling a module provide all inlets
+    r = osc(fm: fm_amt) // when calling a module provide all inlets; calls compute on osc, or error if no compute method
 
     // statically checked
     sin[0] = r.sin[$nvoices - 1][0] * 2
