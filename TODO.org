@@ -413,14 +413,14 @@ for i: i32 = 0; i < 100; i++
 
 ---
 
-type stream = sink -> {}
+type stream = sink[8] -> {}
 
 phasor: {} -> stream = \{} ->
   phase: f32 = 0
 
   return \sink ->
     phase++
-    sink <- phase
+    sink phase
 
 osc: {} -> stream = \{} ->
   p: stream = phasor {}
@@ -502,8 +502,8 @@ hos: osc -> osc -> stream = osc1 osc2 ->
   o2: stream = osc2 { wave: sin32 }
 
   return \_ ->
-    a: f32[$voices] = array $voices \i -> o1() * i
-    b: f32[$voices] = array $voices \i -> o2() * i
+    a = array $voices \i -> o1() * i
+    b = array $voices \i -> o2() * i
 
     return (array $voices \i -> a[i] + b[i])
 
@@ -536,8 +536,16 @@ return \_ ->
 
 * stages
 ** inline all const type values (necessary for delay lines etc) + $voices
+** syntax sugar
+*** [0...] is syntax sugar for array n \_ -> 0
+*** splices
+** SSA form
+** semantic checks
+*** all bindings used
+*** no shadowed values
+*** type of value recursion
 ** typechecking/inference
-** LATER semantic checks
+** LATER range checks
 *** attach range to values
 *** when assigning a value to a binding (or calling a function), check range compatibility statically
 *** when accessing arrays, check range statically
@@ -551,4 +559,53 @@ return \_ ->
 **** e.g. each function needs to compute its layout once
 *** if returning a complex literal, write in to the return region directly
 *** if returning a binding, tag the binding's location with the return region instead
+*** algo
+**** add toplevel bindings to Ident -> Abs map
+**** compute mem layout for every binding/lambda by doing it recursively and memoizing each layout per Ident
+***** no shadowing so all good
 ** codegen
+*** if compiled as module, insert code to transform streams into audio frames
+
+---
+
+* return type of method only simple
+* mem layout = mem layout of module class + mem layout of all methods
+* no shadowing
+
+module Bla
+  @inlet fm: stream/mono/1
+
+  @param(min: 0, max: 10, step: 0.01)
+  fm_amt: f32
+
+  @param(min: 0, max: 10, step: 0.01)
+  vol: f32
+
+  @outlet sin: stream/poly/2
+  @outlet tri: stream/poly/2
+
+  a: f32[$voices]
+  b: f32[$voices]
+
+  osc: OSC // basically a frame pointer
+
+  new(x: f32, y: f32)
+    a = x
+    b = y
+    osc = new OSC(phase: 2)
+
+    a = |$nvoices, i| a[i] * b[i]
+
+  get_delay(): f32
+    return 5
+
+  compute()
+    a: f32 = 0
+
+    r = osc(fm: fm_amt) // when calling a module provide all inlets
+
+    // statically checked
+    sin[0] = r.sin[$nvoices - 1][0] * 2
+    sin[1] = r.sin[$nvoices - 1][0] * 2
+
+    tri = r.vol * 4
