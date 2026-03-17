@@ -572,6 +572,21 @@ return \_ ->
 * mem layout = mem layout of module class + mem layout of all methods
 * no shadowing
 
+merge: stream[m][n] -> stream[m][o] -> stream[m][n + o]
+split: a -> stream[m][n] -> { left: stream[m][a], right: stream[m][n - a] }
+split: a -> stream[m][n] -> (stream[m][a], stream[m][n - a])
+
+# comprehensions
+range (x: number) |n: number| (expr: t): t[x] // simple expansion
+rec |e: s| (expr: s): s
+
+---
+
+f32 <- stream32[m][n]
+rec: (stream32[m][n] -> stream32[m][n]) -> stream32[m][n]
+
+out: sample32[m][n]
+
 module Bla
   @inlet fm: stream/mono/1
 
@@ -581,9 +596,22 @@ module Bla
   @param(min: 0, max: 10, step: 0.01)
   vol: f32
 
-  @outlet sin: stream/mono/2 = graph
-    sin <- osc(fm: fm_amt).sin
-    out[0] <- |n| 1.0 / v * sum(|v| sin[v][n] * 2)
+  @outlet sin: stream[1][2] = graph
+    in: stream[1][2] = graph
+      out[0][0] <- fm_amt
+      out[0][1] <- smth_else
+      
+    sin <- split(1, rec 1 1 |s| merge(
+      graph
+        s <- s[0]
+        out[0][0] = 1 + s
+
+      osc(fm: in).sin
+    ))[1]
+
+    out[0] <- range 2 |n|
+      1.0 / v * sum (range $voices |v| sin[v][n] * 2)
+    out[1] <- 5
 
   @outlet tri: stream/poly/2
 
@@ -599,6 +627,48 @@ module Bla
 
   get_delay(): f32
     return 5
+
+---
+
+event32: { fire: i32 -> unit, event: even32 }
+
+type out = {
+  sin: stream/mono/2
+  out: stream/poly/2
+
+  vol: param
+  fm_amt: param
+
+  something_happened: event32
+}
+
+rec: (stream m n -> stream m n) -> stream m n
+
+(,): stream m n -> stream m o -> stream m (n + o)
+
+clock: stream/mono/1 = rec 1 1 prev -> graph
+  out <- prev + 1
+
+bla: unit -> out = lambda unit ->
+  a: f32[$voices]
+  b: f32[$voices]
+
+  vol: f32
+  fm_amt: f32
+
+  e = event32
+
+  return {
+    sin: graph
+      w <- (osc { fm: fm_amt }).sin + w@256 * 0.01
+      out[0] <- measure e.fire (|n| 1.0 / v * sum(|v| sin[v][n] * 2))
+
+    cos: graph
+      w <- (osc { fm: fm_amt }).sin
+      out[0] <- |n| 1.0 / v * sum(|v| cos[v][n] * 2)
+
+    event: e.event
+  }
 
 ---
 
@@ -646,3 +716,50 @@ sin: signal f32 f32 = proc a -> return (sin a)
 
 map: (f32 -> f32) -> stream -> stream
 ap: (f32 -> f32 -> f32) -> stream -> stream -> stream
+
+---
+
+* structs
+* arrays
+
+in graph it's possible to access stream[m][n]: f32
+rec only in graph
+must return an array
+not possible to define locals; only bindings
+
+graph: (... -> f32[m][n]) -> stream[m][n]
+
+s: stream[1][2]
+
+o = graph
+  r: { clock: f32, str: f32[1][2] } = rec 1 1 |g_prev|
+    return {
+      clock: g_prev.clock + 1
+      str: [osc.sin[0][1] + ph(g_prev.clock), s1 + osc.cos[0][1]]
+    }
+  return r.str
+
+* two options
+** either only static indices in graph
+** or we go the easy oop way without a graph language
+** we can start with the OOP version and then extend
+
+---
+
+* !!! the only to produce anything that's not a map of an inlet/global or constant is through rec
+
+so each expression will always contain
+
+--- OOP syntax + closures
+
+h: fn(f: fn(f32, f32): f32): fn(f32): f32 {
+  return fn(b: f32): f32 {
+    return f(5, b);
+  }
+}
+
+g: graph(f: fn(f32, f32): f32): graph(f32): f32 {
+  return graph(b: f32): f32 {
+    return f(5, b);
+  }
+}
