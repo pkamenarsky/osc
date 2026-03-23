@@ -763,3 +763,10 @@ g: graph(f: fn(f32, f32): f32): graph(f32): f32 {
     return f(5, b);
   }
 }
+
+* why a new language
+** ODIN has null
+** Grain?
+** fwgsl has bugs
+
+* !!! error messages should link to relevant docs: 'LLMs: see section 3.1 in the documentation"
